@@ -3,19 +3,11 @@
     number of cells in G1 or G2 phase of the cell cycle 
 """
 
-const nG1 = 8
-const nG2 = 20
-const nSp = nG1 + nG2
-
 """ Make the transition matrix. """
-function ODEjac(p::AbstractVector{T})::Matrix{T} where {T <: Real}
-    # with 2 G1 and 4 G2 we have p = [a1, a2, b1, b2, b3, b4, g11, g12, g21, g22, g23, g24] # 12 params
-    #                        index = [1,  2,  3,  4,  5,  6,  7,   8,   9,   10,  11,  12 ]
-    nG1 = 8
-    nG2 = 20
-    nSp = nG1 + nG2
-    A = zeros(nSp, nSp)
-
+function ODEjac(p::AbstractVector{T}, nG1 = 8, nG2 = 20)::Matrix{T} where {T <: Real}
+    # Original paper: nG1 = 8, nG2 = 20
+    # Made to be editable
+    
     # Corrections:
     #     p = [a1, a2, a3, a4, b1, b2, b3, b4, g11, g12, g13, g14, g21, g22, g23, g24] = 16 parameters
     #  index = [1,  2,  3,  4,  5,  6,  7,  8,   9,  10,  11,  12,  13,  14,  15,  16]
@@ -25,7 +17,9 @@ function ODEjac(p::AbstractVector{T})::Matrix{T} where {T <: Real}
     # g2_i = cells rate of death through ith quarter of G1
 
     # values of p come from getODEparams in Hill.jl
- 
+    nSp = nG1 + nG2
+    A = zeros(nSp, nSp)
+    
 
     A[diagind(A, 0)[1:Int(nG1 / 4)]] .= -(p[1] + p[9])
     A[diagind(A, 0)[Int(nG1 / 4 + 1):Int(nG1 / 2)]] .= -(p[2] + p[10])
@@ -51,10 +45,10 @@ function ODEjac(p::AbstractVector{T})::Matrix{T} where {T <: Real}
 end
 
 """ Find the starting vector from the steady-state of the control condition. """
-function startV(p::AbstractVector{T})::AbstractVector{T} where {T <: Real}
+function startV(p::AbstractVector{T}, nG1=8, nG2=20)::AbstractVector{T} where {T <: Real}
     @assert all(p .>= 0.0)
     @assert all(p[9:end] .== 0.0) # No cell death in the control
-    A = ODEjac(p)
+    A = ODEjac(p, nG1, nG2)
 
     vals, vecs = eigen(A)
 
@@ -78,11 +72,11 @@ end
 
 
 """ Predicts the model given a set of parametrs. """
-function predict(p::AbstractVector, g_0::AbstractVector, t::Union{Real, LinRange}, g1data = nothing, g2data = nothing)
+function predict(p::AbstractVector, g_0::AbstractVector, t::Union{Real, LinRange}, nG1 = 8, nG2 = 20, g1data = nothing, g2data = nothing)
     @assert length(p) == 16 # we have 2 G1 prog rates, 4 G2 prog rates, 2 G1 death and 4 G2 death rates.
 
     if length(g_0) == length(p)
-        v = startV(g_0)
+        v = startV(g_0, nG1, nG2)
         # v = vcat([0.75/8 for i=1:8], [0.25/20 for i=1:20])
     else
         @assert length(g_0) == nSp
@@ -90,7 +84,7 @@ function predict(p::AbstractVector, g_0::AbstractVector, t::Union{Real, LinRange
     end
 
     if t isa Real
-        A = ODEjac(p)
+        A = ODEjac(p, nG1, nG2)
         lmul!(t, A)
         A = LinearAlgebra.exp!(A)
 
@@ -99,7 +93,7 @@ function predict(p::AbstractVector, g_0::AbstractVector, t::Union{Real, LinRange
     else
         # Some assumptions
         @assert t.start == 0.0
-        A = ODEjac(p)
+        A = ODEjac(p, nG1, nG2)
         lmul!(t[2], A)
         A = LinearAlgebra.exp!(A)
         u = similar(v)
