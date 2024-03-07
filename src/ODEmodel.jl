@@ -73,7 +73,7 @@ end
 
 """ Predicts the model given a set of parametrs. """
 function predict(p::AbstractVector, g_0::AbstractVector, t::Union{Real, LinRange}, nG1 = 8, nG2 = 20, g1data = nothing, g2data = nothing)
-    @assert length(p) == 16 # we have 2 G1 prog rates, 4 G2 prog rates, 2 G1 death and 4 G2 death rates.
+    @assert length(p) == 16 # we have 4 G1 prog rates, 4 G2 prog rates, 4 G1 death and 4 G2 death rates.
 
     if length(g_0) == length(p)
         v = startV(g_0, nG1, nG2)
