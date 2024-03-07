@@ -62,12 +62,13 @@ function getODEparams(p, conc)
         xx = 1.0 ./ (1.0 .+ (p[k] ./ conc[:, i]) .^ p[k + 1])
 
         # [EC50, left, right, steepness]
+        # corrected: labeling of a and b
         effects[1, :, i] = p[j] .+ (p[k + 2] - p[j]) .* xx # a1
         effects[2, :, i] = p[j + 1] .+ (p[k + 3] - p[j + 1]) .* xx # a2
-        effects[3, :, i] = p[j + 2] .+ (p[k + 4] - p[j + 2]) .* xx # b1
-        effects[4, :, i] = p[j + 3] .+ (p[k + 5] - p[j + 3]) .* xx # b2
-        effects[5, :, i] = p[j + 4] .+ (p[k + 6] - p[j + 4]) .* xx # b3
-        effects[6, :, i] = p[j + 5] .+ (p[k + 7] - p[j + 5]) .* xx # b4
+        effects[3, :, i] = p[j + 2] .+ (p[k + 4] - p[j + 2]) .* xx # a3
+        effects[4, :, i] = p[j + 3] .+ (p[k + 5] - p[j + 3]) .* xx # a4
+        effects[5, :, i] = p[j + 4] .+ (p[k + 6] - p[j + 4]) .* xx # b1
+        effects[6, :, i] = p[j + 5] .+ (p[k + 7] - p[j + 5]) .* xx # b2
         effects[7, :, i] = p[j + 6] .+ (p[k + 8] - p[j + 6]) .* xx # b3
         effects[8, :, i] = p[j + 7] .+ (p[k + 9] - p[j + 7]) .* xx # b4
         effects[9, :, i] = p[k + 10] .* xx   # g11
