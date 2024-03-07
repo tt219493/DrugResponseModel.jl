@@ -15,7 +15,17 @@ function ODEjac(p::AbstractVector{T})::Matrix{T} where {T <: Real}
     nG2 = 20
     nSp = nG1 + nG2
     A = zeros(nSp, nSp)
-    
+
+    # Corrections:
+    #     p = [a1, a2, a3, a4, b1, b2, b3, b4, g11, g12, g13, g14, g21, g22, g23, g24] = 16 parameters
+    #  index = [1,  2,  3,  4,  5,  6,  7,  8,   9,  10,  11,  12,  13,  14,  15,  16]
+    # a_i = cells progression rate through ith quarter of G1
+    # b_i = cells progression rate through ith quarter of S/G2
+    # g1_i = cells rate of death through ith quarter of G1
+    # g2_i = cells rate of death through ith quarter of G1
+
+    # values of p come from getODEparams in Hill.jl
+ 
 
     A[diagind(A, 0)[1:Int(nG1 / 4)]] .= -(p[1] + p[9])
     A[diagind(A, 0)[Int(nG1 / 4 + 1):Int(nG1 / 2)]] .= -(p[2] + p[10])
