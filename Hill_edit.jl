@@ -29,8 +29,11 @@ function residHill(x::Vector, conc::Vector, g1::Matrix, g2::Matrix, num_parts::I
     # params: [4n x 8 x 1] (4n params, 8 concs)
     params = getODEparams(x[1:param_end_idx], conc, num_parts)
     
-    nG1 = trunc(Int, param_end_idx + 1)
-    nG2 = trunc(Int, param_end_idx + 2)
+    #nG1 = trunc(Int, param_end_idx + 1)
+    #nG2 = trunc(Int, param_end_idx + 2)
+
+    nG1 = 2
+    nG2 = 5
     
     t = LinRange(0.0, 0.5 * size(g1, 1), size(g1, 1)) # 0.0 to 94.5; 189 steps
 
@@ -82,9 +85,9 @@ function optimize_hill(conc::Vector, g1::Matrix, g2::Matrix, num_parts::Int; max
     # 2 + 6n + 2 parameters
     # nG1 test range: 1 to 4
     # nG2 test range: 1 to 10
-
-    low =  [minimum(conc);   1e-9 * ones(1 + 6*n) ; 1.0; 1.0]
-    high = [2*maximum(conc); 50.0; 4.0 * ones(6*n); 4.0; 10.0]
+    n = num_parts
+    low =  [minimum(conc);   1e-9 * ones(1 + 6*n) ; 2.0; 5.0]
+    high = [2*maximum(conc); 50.0; 4.0 * ones(6*n); 2.0; 5.0]
 
     return optimize_helper(f, low, high, maxstep)
 end

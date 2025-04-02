@@ -11,17 +11,31 @@ function ODEjac(p::AbstractVector{T}, num_parts::Int, nG1::Int, nG2::Int)::Matri
     # g1_i = cells rate of death through ith quarter of G1
     # g2_i = cells rate of death through ith quarter of G1
 
-    nG1_tot = num_parts * nG1
-    nG2_tot = num_parts * nG2
-    nSp =  nG1_tot + nG2_tot
+    #nG1_tot = num_parts * nG1
+    #nG2_tot = num_parts * nG2
+    #nSp =  nG1_tot + nG2_tot
+    nG1 = 2
+    nG2 = 5
+    nG1_tot = 8
+    nG2_tot = 20
+    nSp = 28
     A = zeros(nSp, nSp)
     
     # -(progression + death) rates for itself
     for i = 0:(num_parts-1)
-        A[diagind(A, 0)[(1 + nG1 * i) : (nG1 * (i+1))]] .= -(p[i+1] + p[i+1 + 2*num_parts])
-        A[diagind(A, 0)[(1 + nG1_tot + nG2 * i):(nG1_tot + nG2 * (i+1))]] .= -(p[num_parts+i+1] + p[num_parts+i+1 + 2*num_parts])
-        A[diagind(A, -1)[(1 + nG1 * i) : (nG1 * (i+1))]] .= p[i+1]
-        A[diagind(A, -1)[(1 + nG1_tot + nG2 * i):(nG1_tot + nG2 * (i+1))]] .= p[num_parts+i+1]
+        a = (1 + nG1 * i)
+        b = (nG1 * (i+1))
+        c = (1 + nG1_tot + nG2 * i)
+        d = (nG1_tot + nG2 * (i+1))
+        A[diagind(A, 0)[a:b]] .= -(p[i+1] + p[i+1 + 2*num_parts])
+        A[diagind(A, 0)[c:d]] .= -(p[num_parts+i+1] + p[num_parts+i+1 + 2*num_parts])
+        A[diagind(A, -1)[a:b]] .= p[i+1]
+        
+        if i == num_parts-1
+            d -= 1
+        end
+        
+        A[diagind(A, -1)[c:d]] .= p[num_parts+i+1]
     end
     
     A[1, nSp] = 2 * p[2*num_parts]
@@ -31,12 +45,11 @@ end
 
 """ Find the starting vector from the steady-state of the control condition. """
 function startV(p::AbstractVector{T}, num_parts::Int, nG1::Int, nG2::Int)::AbstractVector{T} where {T <: Real}
-    death_idx = (length(p) / 2) + 1
+    death_idx = Int(length(p) / 2) + 1
     @assert all(p .>= 0.0)
     @assert all(p[death_idx:end] .== 0.0) # No cell death in the control
 
     A = ODEjac(p, num_parts, nG1, nG2)
-
     vals, vecs = eigen(A)
 
     a = real.(vals) .> 0.0
