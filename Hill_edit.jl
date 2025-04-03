@@ -25,21 +25,22 @@ function residHill(x::Vector, conc::Vector, g1::Matrix, g2::Matrix, num_parts::I
         # residual adds 40 * (max - min) ^2 
         res += 40 * (maximum([0, (x[i] - x[i + min_idx])]))^2
     end
-
+    # println(res)
     # params: [4n x 8 x 1] (4n params, 8 concs)
     params = getODEparams(x[1:param_end_idx], conc, num_parts)
     
-    #nG1 = trunc(Int, param_end_idx + 1)
-    #nG2 = trunc(Int, param_end_idx + 2)
-
-    nG1 = 2
-    nG2 = 5
+    nG1 = trunc(Int, x[param_end_idx + 1])
+    nG2 = trunc(Int, x[param_end_idx + 2])
+    
+    #nG1 = 2
+    #nG2 = 5
     
     t = LinRange(0.0, 0.5 * size(g1, 1), size(g1, 1)) # 0.0 to 94.5; 189 steps
 
     # Solve each concentration separately
     for ii = 1:length(conc)
         res += predict(params[:, ii, 1], params[:, 1, 1], t, num_parts, nG1, nG2, g1[:, ii], g2[:, ii])[1] 
+        #println("Res: ", res)
     end
     return res
 end
@@ -62,7 +63,8 @@ end
 
 
 """ Hill optimization function. """
-function optimize_hill(conc::Vector, g1::Matrix, g2::Matrix, num_parts::Int; maxstep = 200000)
+function optimize_hill(conc::Vector, g1::Matrix, g2::Matrix; maxstep = 200000, num_parts = 4, 
+    g1_lower = 2, g1_upper = 2, g2_lower = 5, g2_upper = 5)
     # num_parts: hyperparameter to choose number of parts to use in Jacobian
         # default used in paper: 4
         # default: 28 params
@@ -86,8 +88,8 @@ function optimize_hill(conc::Vector, g1::Matrix, g2::Matrix, num_parts::Int; max
     # nG1 test range: 1 to 4
     # nG2 test range: 1 to 10
     n = num_parts
-    low =  [minimum(conc);   1e-9 * ones(1 + 6*n) ; 2.0; 5.0]
-    high = [2*maximum(conc); 50.0; 4.0 * ones(6*n); 2.0; 5.0]
+    low =  [minimum(conc);   1e-9 * ones(1 + 6*n) ; g1_lower; g2_lower]
+    high = [2*maximum(conc); 50.0; 4.0 * ones(6*n); g1_upper; g2_upper]
 
     return optimize_helper(f, low, high, maxstep)
 end
@@ -138,7 +140,7 @@ function getODEparams(p, conc, num_parts)
         end
 
         # g_11 ... g_1n, g_21 ... g_2n
-        for param = num_prog:num_params
+        for param = (num_prog+1):num_params
             # no deaths in control (E_min = 0)
             effects[param, :, i] = p[k + 1 + param] .* xx
         end

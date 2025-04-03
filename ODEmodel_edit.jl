@@ -11,14 +11,14 @@ function ODEjac(p::AbstractVector{T}, num_parts::Int, nG1::Int, nG2::Int)::Matri
     # g1_i = cells rate of death through ith quarter of G1
     # g2_i = cells rate of death through ith quarter of G1
 
-    #nG1_tot = num_parts * nG1
-    #nG2_tot = num_parts * nG2
-    #nSp =  nG1_tot + nG2_tot
-    nG1 = 2
-    nG2 = 5
-    nG1_tot = 8
-    nG2_tot = 20
-    nSp = 28
+    nG1_tot = num_parts * nG1
+    nG2_tot = num_parts * nG2
+    nSp =  nG1_tot + nG2_tot
+    #nG1 = 2
+    #nG2 = 5
+    #nG1_tot = 8
+    #nG2_tot = 20
+    #nSp = 28
     A = zeros(nSp, nSp)
     
     # -(progression + death) rates for itself
@@ -50,7 +50,10 @@ function startV(p::AbstractVector{T}, num_parts::Int, nG1::Int, nG2::Int)::Abstr
     @assert all(p[death_idx:end] .== 0.0) # No cell death in the control
 
     A = ODEjac(p, num_parts, nG1, nG2)
+    #println(A)
     vals, vecs = eigen(A)
+    #println(vals)
+    #println(vecs)
 
     a = real.(vals) .> 0.0
     select = imag.(vals) .== 0.0
@@ -119,8 +122,10 @@ function predict(p::AbstractVector, g_0::AbstractVector, t::Union{Real, LinRange
 
             for ii = 1:length(t)
                 G1, G2 = vTOg(v, num_parts, nG1, nG2)
+                #println("G1: ", G1)
+                #println("G2: ", G2)
                 cost += norm(G1 - g1data[ii]) + norm(G2 - g2data[ii])
-
+                #println("Cost: ", cost)
                 mul!(u, A, v)
                 copyto!(v, u)
             end
