@@ -7,8 +7,8 @@
 ---
 ### Project: Optimizing the Number of Sub-phases in Drug Response Model 
 
-Edited for projects in C&S Bio 185 and C&S Bio M187 at UCLA. Reports and figures for projects are available in the folders `185` and `M187`.  
-185 project was a short group project while M187 project was a more refined expansion.
+Edited for projects in C&S Bio 185 and C&S Bio M187 at UCLA. 185 project was a short group project while M187 project was a more refined expansion. \
+Reports and figures for projects are available in the folders `185` and `M187`.  
 
 Main changes include being able to alter the number of sub-phases used in the ODE model. 
 
