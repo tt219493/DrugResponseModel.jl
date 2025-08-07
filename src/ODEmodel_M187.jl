@@ -43,6 +43,7 @@ function ODEjac(p::AbstractVector{T}, num_parts::Int, nG1::Int, nG2::Int)::Matri
     return A
 end
 
+
 """ Find the starting vector from the steady-state of the control condition. """
 function startV(p::AbstractVector{T}, num_parts::Int, nG1::Int, nG2::Int)::AbstractVector{T} where {T <: Real}
     death_idx = Int(length(p) / 2) + 1
@@ -136,3 +137,101 @@ function predict(p::AbstractVector, g_0::AbstractVector, t::Union{Real, LinRange
 
     return G1, G2, v
 end
+
+###############################################################################################################################
+# nG1, nG2 are separated from num_parts (individual params for each equation)
+
+function predict_indiv(p::AbstractVector, g_0::AbstractVector, t::Union{Real, LinRange}, nG1::Int, nG2::Int, g1data = nothing, g2data = nothing)
+    # g_0 = params for 0 concentration (control)
+    nSp = (nG1 + nG2)
+    @assert length(p) == 2*nSp # we have nG1 G1 prog rates, nG2 G2 prog rates, nG1 G1 death and nG2 G2 death rates.
+
+    if length(g_0) == length(p)
+        v = startV_indiv(g_0, nG1, nG2)
+    else
+        @assert length(g_0) == nSp
+        v = copy(g_0)
+    end
+
+    #lmul! = left-multiplication
+    if t isa Real
+        A = ODEjac_indiv(p, nG1, nG2)
+        lmul!(t, A)
+        A = LinearAlgebra.exp!(A)
+
+        v = A * v
+        G1, G2 = vTOg_indiv(v, nG1, nG2)
+    else
+        # Some assumptions
+        @assert t.start == 0.0
+        A = ODEjac_indiv(p, nG1, nG2)
+        lmul!(t[2], A)
+        A = LinearAlgebra.exp!(A)
+        u = similar(v)
+
+        if g1data === nothing
+            G1 = Vector{eltype(p)}(undef, length(t))
+            G2 = Vector{eltype(p)}(undef, length(t))
+
+            for ii = 1:length(t)
+                G1[ii], G2[ii] = vTOg_indiv(v, nG1, nG2)
+
+                mul!(u, A, v)
+                copyto!(v, u)
+            end
+        else
+            cost = 0.0
+
+            for ii = 1:length(t)
+                G1, G2 = vTOg_indiv(v, nG1, nG2)
+                cost += norm(G1 - g1data[ii]) + norm(G2 - g2data[ii])
+                mul!(u, A, v)
+                copyto!(v, u)
+            end
+
+            return cost, v
+        end
+    end
+
+    return G1, G2, v
+end
+
+""" Find the starting vector from the steady-state of the control condition. """
+function startV_indiv(p::AbstractVector{T}, nG1::Int, nG2::Int)::AbstractVector{T} where {T <: Real}
+    death_idx = nG1 + nG2 + 1
+    @assert all(p .>= 0.0)
+    @assert all(p[death_idx:end] .== 0.0) # No cell death in the control
+
+    A = ODEjac_indiv(p, nG1, nG2)
+    vals, vecs = eigen(A)
+
+    a = real.(vals) .> 0.0
+    select = imag.(vals) .== 0.0
+    selectt = a .* select
+    @assert sum(selectt) == 1
+    vecs = vec(vecs[:, selectt])
+    @assert all(isreal.(vals[selectt]))
+    @assert all(isreal.(vecs))
+
+    return vecs / sum(vecs)
+end
+
+function ODEjac_indiv(p::AbstractVector{T}, nG1::Int, nG2::Int)::Matrix{T} where {T <: Real}
+    nSp = nG1 + nG2
+    A = zeros(nSp, nSp)
+    
+    A[diagind(A, 0)] = -(p[1:nSp] + p[(nSp+1):end])
+    A[diagind(A, -1)] = p[1:(nSp-1)]    
+    A[1, nSp] = 2 * p[nSp]
+
+    return A
+end
+
+function vTOg_indiv(v::AbstractVector, nG1::Int, nG2::Int)
+    nSp = nG1 + nG2
+    G1 = sum(view(v, 1:nG1))
+    G2 = sum(view(v, (nG1+1):nSp))
+    return G1, G2
+end
+
+
