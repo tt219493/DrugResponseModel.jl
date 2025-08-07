@@ -4,6 +4,16 @@
 ![Test](https://github.com/meyer-lab/DrugResponseModel.jl/workflows/Test/badge.svg)
 [![DOI](https://zenodo.org/badge/186165308.svg)](https://zenodo.org/badge/latestdoi/186165308)
 
+---
+
+Edited for projects in C&S Bio 185 and C&S Bio M187
+Reports and figures for projects are available in the folders `185` and `M187`
+185 project was a short group project while M187 project was a more refined expansion.
+Main changes include being able to alter the number of sub-phases used in the ODE model. To utilize changes, change `src/DrugResponseModel.jl` to include `XX_185.jl` or `XX_M187.jl`.
+Examples of use are included within my unorganized experiments in the Jupyter Notebooks.
+
+---
+
 `DrugResponseModel` is a Julia package for analyzing drug response in population cell number data with respect to cell cycle phase effects. The model is a system of linear first order differential equations where the parameters of the model reflect the quantified effects of drugs on different cell cycle phases; the rate of phase progression and the rate of cell death. With this model and the inferred parameters from fitting, we predicted the effects of drug combinations.
 
 - [Overview](#Overview)
