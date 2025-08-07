@@ -56,6 +56,7 @@ function optimize_helper(f, low::Vector, high::Vector, maxstep::Int)
         TraceInterval = 100,
         MaxSteps = maxstep,
         Method = :adaptive_de_rand_1_bin_radiuslimited
+        #Method = :adaptive_de_rand_1_bin
     )
 
     return best_fitness(results_ode), best_candidate(results_ode)
@@ -162,3 +163,152 @@ function costingss(pp, total, concs)
     end
     return cost
 end
+
+
+#######################################################################################################################################
+#
+# MANUAL INPUT OF G1/G2
+#########################
+
+function optimize_hill_manual(conc::Vector, g1::Matrix, g2::Matrix; maxstep = 200000, num_parts = 4, 
+    nG1=2, nG2=5)
+    # num_parts: hyperparameter to choose number of parts to use in Jacobian
+        # default used in paper: 4
+        # default: 28 params
+        # nG1 default: 2
+        # nG2 default: 5
+
+    f(x) = residHill_manual(x, conc, g1, g2, num_parts, nG1, nG2)
+
+    # add nG1 and nG2 to fit for best number of sub-parts
+
+    # [EC50, k, 
+    # max_a1,  ..., max_an, 
+    # max_b1,  ..., max_bn, 
+    # max_g11, ..., max_g1n,
+    # max_g21, ..., max_g2n, 
+    # min_a1,  ..., min_an,
+    # min_b1,  ..., min_b2,
+    # nG1, nG2]
+
+    # 2 + 6n + 2 parameters
+    # nG1 test range: 1 to 4
+    # nG2 test range: 1 to 10
+    n = num_parts
+    low =  [minimum(conc);   1e-9 * ones(1 + 6*n)]
+    high = [2*maximum(conc); 50.0; 4.0 * ones(6*n)]
+
+    return optimize_helper(f, low, high, maxstep)
+end
+
+function residHill_manual(x::Vector, conc::Vector, g1::Matrix, g2::Matrix, num_parts::Int, nG1::Int, nG2::Int)
+    # n = num_parts
+    # x: 2 + 6n + 2 params
+    # conc: [8 x 5] (8 concentrations for 5 drugs)
+    # g1: [189 x 8 x 5] (189 time points for 96 hours)
+    # g2: [189 x 8 x 5]
+
+    # 3 = beginning of max params idx
+    # 2 + 2n = end of max params idx
+
+    # max idx + 4n = min idx
+    max_end_idx = 2 + 2 * num_parts
+    min_idx = 4 * num_parts
+    param_end_idx = max_end_idx + min_idx
+
+    res = 0.0
+    for i = 3:max_end_idx
+        # residual adds 40 * (max - min) ^2 
+        res += 40 * (maximum([0, (x[i] - x[i + min_idx])]))^2
+    end
+
+    # params: [4n x 8 x 1] (4n params, 8 concs)
+    params = getODEparams(x[1:param_end_idx], conc, num_parts)
+       
+    t = LinRange(0.0, 0.5 * size(g1, 1), size(g1, 1)) # 0.0 to 94.5; 189 steps
+
+    # Solve each concentration separately
+    for ii = 1:length(conc)
+        res += predict(params[:, ii, 1], params[:, 1, 1], t, num_parts, nG1, nG2, g1[:, ii], g2[:, ii])[1] 
+    end
+    return res
+end
+
+###############################################################################################################################
+# nG1, nG2 are separated from num_parts (individual params for each equation)
+
+
+""" Hill optimization function. """
+function optimize_hill_indiv(conc::Vector, g1::Matrix, g2::Matrix; maxstep = 200000, nG1 = 6, nG2 = 22)
+    f(x) = residHill_indiv(x, conc, g1, g2, nG1, nG2)
+
+    # add nG1 and nG2 to fit for best number of sub-parts
+
+    # [EC50, k, 
+    # max_a1,  ..., max_ang1, 
+    # max_b1,  ..., max_bng2, 
+    # max_g11, ..., max_g1n,
+    # max_g21, ..., max_g2n, 
+    # min_a1,  ..., min_ang1, 
+    # min_b1,  ..., min_bng2, 
+    # ]
+    
+    low =  [minimum(conc);   1e-9 * ones(1 + 3*(nG1 + nG2))]
+    high = [2*maximum(conc); 50.0; 4.0 * ones(3*(nG1 + nG2))]
+
+    return optimize_helper(f, low, high, maxstep)
+end
+
+function residHill_indiv(x::Vector, conc::Vector, g1::Matrix, g2::Matrix, nG1::Int, nG2::Int)
+    max_end_idx = 2 + (nG1 + nG2)
+    min_idx = 2 * (nG1 + nG2)
+
+    res = 0.0
+    for i = 3:max_end_idx
+        # residual adds 40 * (max - min) ^2 
+        res += 40 * (maximum([0, (x[i] - x[i + min_idx])]))^2
+    end
+    
+    params = getODEparams_indiv(x, conc, nG1, nG2)
+        
+    t = LinRange(0.0, 0.5 * size(g1, 1), size(g1, 1)) 
+
+    # Solve each concentration separately
+    for ii = 1:length(conc)
+        res += predict_indiv(params[:, ii, 1], params[:, 1, 1], t, nG1, nG2, g1[:, ii], g2[:, ii])[1] 
+    end
+    return res
+end
+
+function getODEparams_indiv(p, conc, nG1, nG2)
+    nMax = 1
+    num_params = 2 * (nG1 + nG2)
+    num_prog = nG1 + nG2 # number of progression params (a_n, b_n)
+
+    effects = zeros(eltype(p), num_params, length(conc[:, 1]), nMax)    
+
+    k = 1
+    j = 2 + num_params # number of independent params (j + 1 = starting index of control params)
+
+
+    # Scaled drug effect
+    for i = 1:nMax
+        xx = 1.0 ./ (1.0 .+ (p[k] ./ conc[:, i]) .^ p[k + 1]) 
+
+        # a_1 ... a_n, b_1, ... b_n
+        for param = 1:num_prog
+            effects[param, :, i] = p[j + param] .+ (p[k + 1 + param] - p[j + param]) .* xx
+        end
+
+        # g_11 ... g_1n, g_21 ... g_2n
+        for param = (num_prog+1):num_params
+            # no deaths in control (E_min = 0)
+            effects[param, :, i] = p[k + 1 + param] .* xx
+        end
+
+        k += j
+    end
+    return effects
+end
+
+
